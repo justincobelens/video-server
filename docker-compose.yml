@@ -6,7 +6,7 @@ services:
     environment:
       SOURCE: "file"
       # SOURCE: "webcam"
-      VIDEO_PATH: "/videos/uav_video.mp4"
+      VIDEO_PATH: "/videos/example_uav.mp4"
       RTSP_PORT: "8554"
       MOUNT_POINT: "/drone"
       WIDTH: "720"
@@ -14,4 +14,4 @@ services:
       FRAMERATE: "25"
       BITRATE: "600"
     volumes:
-      - ./video:/videos:ro
+      - ./videos:/videos:ro
