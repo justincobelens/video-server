@@ -17,6 +17,8 @@ def _env_int(key: str, default: int) -> int:
 
 
 log = logging.getLogger("rtsp_streamer.config")
+_VIDEO_PATH = _env("VIDEO_PATH")
+_CAMERA_DEVICE = _env("CAMERA_DEVICE")
 
 
 def _validate_video_path(video_path: Path | None) -> None:
@@ -32,13 +34,18 @@ def _validate_video_path(video_path: Path | None) -> None:
         raise FileNotFoundError(video_path)
 
 
+def _validate_camera_device(device_path: Path) -> None:
+    if not device_path.exists():
+        log.error(f"Camera device does not exist: {device_path}")
+        raise FileNotFoundError(device_path)
+
+
 @dataclass(slots=True, frozen=True)
 class Config:
     # input
     source: str = _env("SOURCE", "file")
-    video_path = _env("VIDEO_PATH")
-
-    video_path: Path | None = Path(video_path) if video_path else None
+    video_path: Path | None = Path(_VIDEO_PATH) if _VIDEO_PATH else None
+    camera_device: Path | None = Path(_CAMERA_DEVICE) if _CAMERA_DEVICE else None
     camera_index: int = _env_int("CAMERA_INDEX", 0)
 
     # output
@@ -57,7 +64,12 @@ class Config:
     def is_webcam(self) -> bool:
         return self.source.lower() == "webcam"
 
+    @property
+    def camera_device_path(self) -> Path:
+        return self.camera_device or Path(f"/dev/video{self.camera_index}")
+
     def validate(self) -> None:
         if self.is_webcam:
+            _validate_camera_device(self.camera_device_path)
             return
         _validate_video_path(self.video_path)

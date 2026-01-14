@@ -10,9 +10,9 @@ class PipelineBuilder:
 
     def source(self) -> "PipelineBuilder":
         part = (
-            f"v4l2src device=/dev/video{self.cfg.camera_index} ! videoconvert"
+            f"v4l2src device={self.cfg.camera_device_path} do-timestamp=true"
             if self.cfg.is_webcam
-            else f"filesrc location={self.cfg.video_path} ! decodebin ! videoconvert"
+            else f"filesrc location={self.cfg.video_path} ! decodebin"
         )
         self._add(part)
         return self
@@ -24,6 +24,10 @@ class PipelineBuilder:
                 f"video/x-raw,width={self.cfg.width},height={self.cfg.height}"
             )
         return self
+    
+    def leaky_queue(self) -> "PipelineBuilder":
+        self._add("queue max-size-buffers=1 max-size-time=0 max-size-bytes=0 leaky=downstream")
+        return self
 
     def framerate(self) -> "PipelineBuilder":
         if self.cfg.framerate:
@@ -31,15 +35,24 @@ class PipelineBuilder:
         return self
 
     def encode_h264(self) -> "PipelineBuilder":
+        fps = self.cfg.framerate or 25
         self._add(
-            "x264enc tune=zerolatency "
-            f"speed-preset=ultrafast bitrate={self.cfg.bitrate}"
+            "videoconvert ! video/x-raw,format=I420 ! "
+            "x264enc tune=zerolatency speed-preset=ultrafast "
+            f"bitrate={self.cfg.bitrate} key-int-max={fps} "
+            "bframes=0 rc-lookahead=0 sync-lookahead=0"
+        )
+        self._add("video/x-h264,profile=baseline,stream-format=byte-stream,alignment=au")
+        self._add("h264parse config-interval=1")
+        return self
+
+
+    def payload_rtp(self, pt: int = 96) -> "PipelineBuilder":
+        self._add(
+            f"rtph264pay name=pay0 pt={pt} config-interval=1 mtu=1200 aggregate-mode=zero-latency"
         )
         return self
 
-    def payload_rtp(self, pt: int = 96) -> "PipelineBuilder":
-        self._add(f"rtph264pay name=pay0 pt={pt} ")
-        return self
 
     def default_h264(self) -> str:
         return (
@@ -47,7 +60,9 @@ class PipelineBuilder:
             .source()
             .scale()
             .framerate()
+            .leaky_queue()
             .encode_h264()
+            .leaky_queue()
             .payload_rtp()
             .build()
         )

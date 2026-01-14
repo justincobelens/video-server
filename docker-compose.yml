@@ -2,13 +2,16 @@ services:
   streamer:
     build: .
     ports:
-      - "8554:8554"
+      - "554:554"
+    devices:
+      - /dev/video0:/dev/video0
     environment:
-      SOURCE: "file"
-      # SOURCE: "webcam"
+      # SOURCE: "file"
+      SOURCE: "webcam"
+      CAMERA_DEVICE: "/dev/video0"
       VIDEO_PATH: "/videos/example_uav.mp4"
-      RTSP_PORT: "8554"
-      MOUNT_POINT: "/drone"
+      RTSP_PORT: "554"
+      MOUNT_POINT: "/main"
       WIDTH: "720"
       HEIGHT: "512"
       FRAMERATE: "25"
